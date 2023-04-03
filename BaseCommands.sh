@@ -1,9 +1,62 @@
 FFMPEG="_deps/ffmpeg-build/ffmpeg -y -init_hw_device vpe=dev0:/dev/transcoder0,vpeloglevel=3 -vsync 0"
-OUT_FOLDER="../videos/BaseOptions_output"
-YUV_INPUT1="-s 1920x1080 -pix_fmt yuv420p -i ../videos/FourPeople_1920x1080_raw_yuv420p.yuv"
-h264_INPUT1="/group/ngcodec/video_clips/u30/source/BigBukBunny_1080p30.264"
-h264_INPUT2_10BIT="../videos/crowd10_420_out_720p25_1000kbps.h264"
-YUV_INPUT2_10BIT="-s 1280x720 -pix_fmt p010le -i ../videos/16b_op1_10bit_four_people_1280x720.yuv"
+f [ $# != 10 ]
+then
+  echo "BaseCommands.sh <output_folder_path> <yuv_8bit_path> <yuv_8bit_res> <yuv_8bit_fmt> <yuv_10bit_path> <yuv_10bit_res> <yuv_10bit_fmt> <h264_8bit_path> <h264_10_bit_path>"
+  exit
+fi
+
+#PRECHECK
+if  [ ! -d $1 ]
+then
+  echo "Output folder $1 doesnot exist"
+  exit
+fi
+
+if [ ! -f $2 ]
+then
+  echo "8 bit yuv $2 doesnot exist"
+  exit
+fi
+
+if [ ! -f $5 ]
+then
+  echo "10 bit yuv $5 doesnot exist"
+  exit
+fi
+
+if [ ! -f $8 ]
+then
+  echo "8 bit h264 $8 doesnot exist"
+  exit
+fi
+
+if [ ! -f $9 ]
+then
+  echo "10 bit h264 $9 doesnot exist"
+  exit
+fi
+
+if [ "$4"!="nv12" ] && ["$4"!="yuv420p" ]
+then
+  echo " 8 bit yuv input format should be either yuv420p or nv12"
+  exit
+fi
+
+if [ "$7"!="p010le" ] && ["$7"!="yuv420p10le" ]
+then
+  echo " 10 bit yuv input format should be either yuv420p10le or p010le"
+  exit
+fi
+
+pushd ../ma35/build/
+
+
+FFMPEG="_deps/ffmpeg-build/ffmpeg -hide_banner -y -init_hw_device vpe=dev0:/dev/transcoder0,vpeloglevel=3 -vsync 0"
+OUT_FOLDER="$1"
+YUV_INPUT1="-s $4 -pix_fmt $3 -i $2"
+h264_INPUT1=$8
+h264_INPUT2_10BIT=$9
+YUV_INPUT2_10BIT="-s $6 -pix_fmt $7 -i $5"
 
 mkdir -p ${OUT_FOLDER}
 
