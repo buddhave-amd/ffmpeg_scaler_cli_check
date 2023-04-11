@@ -1,63 +1,79 @@
+#echo "$#"
+#echo "$@"
 if [ $# != 10 ]
 then
-  echo "NewCommands.sh <output_folder_path> <yuv_8bit_path> <yuv_8bit_res> <yuv_8bit_fmt> <yuv_10bit_path> <yuv_10bit_res> <yuv_10bit_fmt> <h264_8bit_path> <h264_10_bit_path>"
+  echo "<exe_name> <ffmpeg exe path>  <output_folder_path> <yuv_8bit_path> <yuv_8bit_res> <yuv_8bit_fmt> <yuv_10bit_path> <yuv_10bit_res> <yuv_10bit_fmt> <h264_8bit_path> <h264_10_bit_path>"
   exit
 fi
+
+
+FFMPEG_EXE=$1
+OUT_FOLDER=$2
+YUV_8BIT_PATH=$3
+YUV_8BIT_RES=$4
+YUV_8BIT_FMT=$5
+YUV_10BIT_PATH=$6
+YUV_10BIT_RES=$7
+YUV_10BIT_FMT=$8
+H264_8BIT_PATH=$9
+H264_10BIT_PATH=${10}
+
+FFMPEG="$FFMPEG_EXE -hide_banner -y -init_hw_device ama=dev0:/dev/transcoder0,vpeloglevel=3 -vsync 0"
+YUV_INPUT1="-s $YUV_8BIT_RES -pix_fmt $YUV_8BIT_FMT -i $YUV_8BIT_PATH"
+h264_INPUT1=$H264_8BIT_PATH
+h264_INPUT2_10BIT=$H264_10BIT_PATH
+YUV_INPUT2_10BIT="-s $YUV_10BIT_RES -pix_fmt $YUV_10BIT_FMT -i $YUV_10BIT_PATH"
 
 #PRECHECK
-if  [ ! -d $1 ]
+#out folder
+if  [ ! -d $OUT_FOLDER ]
 then
-  echo "Output folder $1 doesnot exist"
+  echo "Output folder $OUT_FOLDER doesnot exist"
+  echo "creating out folder"
+  mkdir $OUT_FOLDER
+  fi
+#yuv 8 bit input path
+if [ ! -f $YUV_8BIT_PATH ]
+then
+  echo "8 bit yuv $YUV_8BIT_PATH doesnot exist"
   exit
 fi
 
-if [ ! -f $2 ]
+#yuv 10 bit input path
+if [ ! -f $YUV_10BIT_PATH ]
 then
-  echo "8 bit yuv $2 doesnot exist"
+  echo "10 bit yuv $YUV_10BIT_PATH doesnot exist"
   exit
 fi
 
-if [ ! -f $5 ]
+#h264 8 bit input path
+if [ ! -f $H264_8BIT_PATH ]
 then
-  echo "10 bit yuv $5 doesnot exist"
+  echo "8 bit h264 $H264_8BIT_PATH doesnot exist"
   exit
 fi
 
-if [ ! -f $8 ]
+#h264 10 bit input path
+if [ ! -f $H264_10BIT_PATH ]
 then
-  echo "8 bit h264 $8 doesnot exist"
+  echo "10 bit h264 $H264_10BIT_PATH doesnot exist"
   exit
 fi
 
-if [ ! -f $9 ]
-then
-  echo "10 bit h264 $9 doesnot exist"
-  exit
-fi
-
-if [ "$4"!="nv12" ] && ["$4"!="yuv420p" ] 
+#yuv 8 bit input fmt
+if [ "$YUV_8BIT_FMT" != "nv12" ] && [ "$YUV_8BIT_FMT" != "yuv420p" ] 
 then  
-  echo " 8 bit yuv input format should be either yuv420p or nv12"
+  echo " 8 bit yuv input format:"$YUV_8BIT_FMT" should be either yuv420p or nv12"
   exit
 fi
 
-if [ "$7"!="p010le" ] && ["$7"!="yuv420p10le" ]
+#yuv 10 bit input fmt
+if [ "$YUV_10BIT_FMT" != "p010le" ] && [ "$YUV_10BIT_FMT" != "yuv420p10le" ]
 then
-  echo " 10 bit yuv input format should be either yuv420p10le or p010le"
+  echo " 10 bit yuv input format:"$YUV_10BIT_FMT" should be either yuv420p10le or p010le"
   exit
 fi
 
-pushd ../ma35/build/
-
-
-FFMPEG="_deps/ffmpeg-build/ffmpeg -hide_banner -y -init_hw_device vpe=dev0:/dev/transcoder0,vpeloglevel=3 -vsync 0"
-OUT_FOLDER="$1"
-YUV_INPUT1="-s $4 -pix_fmt $3 -i $2"
-h264_INPUT1=$8
-h264_INPUT2_10BIT=$9
-YUV_INPUT2_10BIT="-s $6 -pix_fmt $7 -i $5"
-
-mkdir -p ${OUT_FOLDER}
 
 set -x
 
@@ -65,7 +81,7 @@ set -x
 ${FFMPEG} -i ${h264_INPUT1} -filter_complex "hwupload[in];[in]scaler_ma=outputs=2:out_res=(1280x720|nv12)(1280x720|nv12)[a][b];[a]hwdownload,format=nv12[a1];[b]hwdownload,format=nv12[b1]" -map "[a1]" -vframes 10 -f rawvideo -pix_fmt nv12 ${OUT_FOLDER}/01_op1_nv12_BigBukBunny_1280x720.yuv -map "[b1]" -vframes 10 -f rawvideo -pix_fmt nv12 ${OUT_FOLDER}/01_op2_nv12_BigBukBunny_1280x720.yuv
 
 #2. h264 -->(hw decode)--> -->scaler(some setting)-->hwdownload-->2 yuv op
-${FFMPEG} -c:v h264dec_vpe -i ${h264_INPUT1} -filter_complex "scaler_ma=outputs=2:out_res=(1280x720|nv12)(1280x720|nv12)[a][b];[a]hwdownload,format=nv12[a1];[b]hwdownload,format=nv12[b1]" -map "[a1]" -vframes 10 -f rawvideo -pix_fmt nv12 ${OUT_FOLDER}/02_op1_nv12_BigBukBunny_1280x720.yuv -map "[b1]" -vframes 10 -f rawvideo -pix_fmt nv12 ${OUT_FOLDER}/02_op2_nv12_BigBukBunny_1280x720.yuv
+${FFMPEG} -c:v h264_ama -i ${h264_INPUT1} -filter_complex "scaler_ma=outputs=2:out_res=(1280x720|nv12)(1280x720|nv12)[a][b];[a]hwdownload,format=nv12[a1];[b]hwdownload,format=nv12[b1]" -map "[a1]" -vframes 10 -f rawvideo -pix_fmt nv12 ${OUT_FOLDER}/02_op1_nv12_BigBukBunny_1280x720.yuv -map "[b1]" -vframes 10 -f rawvideo -pix_fmt nv12 ${OUT_FOLDER}/02_op2_nv12_BigBukBunny_1280x720.yuv
 
 #3. yuv i/p --> hw upload--> scaler(single nv12 format)--> hwdownload-->4 yuv
 ${FFMPEG} ${YUV_INPUT1} -filter_complex "hwupload[in];[in]scaler_ma=outputs=4:out_res=(1280x720|nv12)(1280x720|nv12)(1280x720|nv12)(1280x720|nv12)[a][b][c][d];[a]hwdownload,format=nv12[a1];[b]hwdownload,format=nv12[b1];[c]hwdownload,format=nv12[c1];[d]hwdownload,format=nv12[d1]" -map "[a1]" -vframes 10 -f rawvideo -pix_fmt nv12 ${OUT_FOLDER}/03_op1_nv12_four_people_1280x720.yuv -map "[b1]" -vframes 10 -f rawvideo -pix_fmt nv12 ${OUT_FOLDER}/03_op2_nv12_people_four_people_1280x720.yuv -map "[c1]" -vframes 10 -f rawvideo -pix_fmt nv12 ${OUT_FOLDER}/03_op3_nv12_people_four_people_1280x720.yuv -map "[d1]" -vframes 10 -f rawvideo -pix_fmt nv12 ${OUT_FOLDER}/03_op4_nv12_people_four_people_1280x720.yuv
@@ -126,4 +142,3 @@ ${FFMPEG} -vsync 0 ${YUV_INPUT2_10BIT} -filter_hw_device dev0 -filter_complex "h
 ${FFMPEG} -vsync 0 ${YUV_INPUT2_10BIT} -filter_hw_device dev0 -filter_complex "hwupload[in];[in]scaler_ma=outputs=2:out_res=(1280x720|yuv420p10le)(1280x720|p010le)[a][b];[a]hwdownload,format=yuv420p10le[a1];[b]hwdownload,format=p010le[b1]" -map "[a1]" -vframes 10 -f rawvideo -pix_fmt yuv420p10le ${OUT_FOLDER}/21_op1_10bit_yuv420p10le_four_people_1280x720.yuv -map "[b1]" -vframes 10 -f rawvideo -pix_fmt p010le ${OUT_FOLDER}/21_op2_10bit_p010le_four_people_1280x720.yuv
 
 set +x
-popd
